@@ -373,9 +373,13 @@ features in the future.
 ## 17. Author
 
 ## Course: 
+
 Student Name: Pentakota Hemanth 
+
 Registration Number: 26MIM10061 
+
 College: VIT Bhopal 
+
 Academic Year: 2026–2027
 
 ## 18. License
