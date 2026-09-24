@@ -1,0 +1,570 @@
+import sqlite3
+from datetime import datetime
+
+
+DATABASE_NAME = "campusmate.db"
+
+
+# ---------------- DATABASE ----------------
+
+def initialize_database():
+    connection = sqlite3.connect(DATABASE_NAME)
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS student (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            roll_no TEXT UNIQUE NOT NULL,
+            course TEXT,
+            semester TEXT
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS assignments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            subject TEXT,
+            due_date TEXT,
+            status TEXT DEFAULT 'Pending'
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS attendance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            attended INTEGER DEFAULT 0,
+            total INTEGER DEFAULT 0
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS study_plan (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            study_date TEXT,
+            duration INTEGER
+        )
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS performance (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            marks REAL
+        )
+    """)
+
+    connection.commit()
+    connection.close()
+
+
+# ---------------- BANNER ----------------
+
+def display_banner():
+    print("\n" + "=" * 60)
+    print("                         CAMPUSMATE")
+    print("               Student Productivity System")
+    print("=" * 60)
+
+
+# ---------------- STUDENT PROFILE ----------------
+
+def student_menu():
+
+    while True:
+        print("\n--- Student Profile ---")
+        print("1. Add Student")
+        print("2. View Student")
+        print("3. Back")
+
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+
+            name = input("Enter student name: ").strip()
+            roll_no = input("Enter roll number: ").strip()
+            course = input("Enter course: ").strip()
+            semester = input("Enter semester: ").strip()
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            try:
+                cursor.execute("""
+                    INSERT INTO student
+                    (name, roll_no, course, semester)
+                    VALUES (?, ?, ?, ?)
+                """, (name, roll_no, course, semester))
+
+                connection.commit()
+                print("\nStudent profile added successfully.")
+
+            except sqlite3.IntegrityError:
+                print("\nRoll number already exists.")
+
+            connection.close()
+
+        elif choice == "2":
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            cursor.execute("SELECT * FROM student")
+            students = cursor.fetchall()
+
+            if not students:
+                print("\nNo student profile found.")
+            else:
+                for student in students:
+                    print("\nID:", student[0])
+                    print("Name:", student[1])
+                    print("Roll No:", student[2])
+                    print("Course:", student[3])
+                    print("Semester:", student[4])
+
+            connection.close()
+
+        elif choice == "3":
+            break
+
+        else:
+            print("Invalid choice.")
+
+
+# ---------------- ASSIGNMENTS ----------------
+
+def assignments_menu():
+
+    while True:
+
+        print("\n--- Assignment Manager ---")
+        print("1. Add Assignment")
+        print("2. View Assignments")
+        print("3. Mark Assignment Completed")
+        print("4. Back")
+
+        choice = input("Enter your choice: ").strip()
+
+        connection = sqlite3.connect(DATABASE_NAME)
+        cursor = connection.cursor()
+
+        if choice == "1":
+
+            title = input("Assignment title: ")
+            subject = input("Subject: ")
+            due_date = input("Due date (YYYY-MM-DD): ")
+
+            cursor.execute("""
+                INSERT INTO assignments
+                (title, subject, due_date)
+                VALUES (?, ?, ?)
+            """, (title, subject, due_date))
+
+            connection.commit()
+
+            print("\nAssignment added successfully.")
+
+        elif choice == "2":
+
+            cursor.execute("""
+                SELECT id, title, subject, due_date, status
+                FROM assignments
+            """)
+
+            assignments = cursor.fetchall()
+
+            if not assignments:
+                print("\nNo assignments found.")
+            else:
+                for assignment in assignments:
+                    print(
+                        f"\nID: {assignment[0]}"
+                        f"\nTitle: {assignment[1]}"
+                        f"\nSubject: {assignment[2]}"
+                        f"\nDue Date: {assignment[3]}"
+                        f"\nStatus: {assignment[4]}"
+                    )
+
+        elif choice == "3":
+
+            assignment_id = input("Enter assignment ID: ")
+
+            cursor.execute("""
+                UPDATE assignments
+                SET status = 'Completed'
+                WHERE id = ?
+            """, (assignment_id,))
+
+            connection.commit()
+
+            print("\nAssignment marked as completed.")
+
+        elif choice == "4":
+            connection.close()
+            break
+
+        else:
+            print("Invalid choice.")
+
+        connection.close()
+
+
+# ---------------- ATTENDANCE ----------------
+
+def attendance_menu():
+
+    while True:
+
+        print("\n--- Attendance Manager ---")
+        print("1. Add/Update Attendance")
+        print("2. View Attendance")
+        print("3. Back")
+
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+
+            subject = input("Subject: ")
+
+            try:
+                attended = int(input("Classes attended: "))
+                total = int(input("Total classes: "))
+
+                if attended < 0 or total <= 0 or attended > total:
+                    print("Invalid attendance values.")
+                    continue
+
+            except ValueError:
+                print("Please enter numbers.")
+                continue
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            cursor.execute("""
+                SELECT id FROM attendance
+                WHERE subject = ?
+            """, (subject,))
+
+            existing = cursor.fetchone()
+
+            if existing:
+
+                cursor.execute("""
+                    UPDATE attendance
+                    SET attended = ?, total = ?
+                    WHERE subject = ?
+                """, (attended, total, subject))
+
+            else:
+
+                cursor.execute("""
+                    INSERT INTO attendance
+                    (subject, attended, total)
+                    VALUES (?, ?, ?)
+                """, (subject, attended, total))
+
+            connection.commit()
+            connection.close()
+
+            print("\nAttendance saved successfully.")
+
+        elif choice == "2":
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            cursor.execute("""
+                SELECT subject, attended, total
+                FROM attendance
+            """)
+
+            records = cursor.fetchall()
+
+            if not records:
+                print("\nNo attendance records found.")
+
+            for subject, attended, total in records:
+
+                percentage = (attended / total) * 100
+
+                print(
+                    f"\nSubject: {subject}"
+                    f"\nAttendance: {attended}/{total}"
+                    f"\nPercentage: {percentage:.2f}%"
+                )
+
+            connection.close()
+
+        elif choice == "3":
+            break
+
+        else:
+            print("Invalid choice.")
+
+
+# ---------------- STUDY PLANNER ----------------
+
+def study_menu():
+
+    while True:
+
+        print("\n--- Study Planner ---")
+        print("1. Add Study Plan")
+        print("2. View Study Plan")
+        print("3. Back")
+
+        choice = input("Enter your choice: ").strip()
+
+        connection = sqlite3.connect(DATABASE_NAME)
+        cursor = connection.cursor()
+
+        if choice == "1":
+
+            subject = input("Subject: ")
+            study_date = input("Study date (YYYY-MM-DD): ")
+
+            try:
+                duration = int(input("Duration in minutes: "))
+
+                if duration <= 0:
+                    print("Duration must be positive.")
+                    connection.close()
+                    continue
+
+            except ValueError:
+                print("Enter a valid number.")
+                connection.close()
+                continue
+
+            cursor.execute("""
+                INSERT INTO study_plan
+                (subject, study_date, duration)
+                VALUES (?, ?, ?)
+            """, (subject, study_date, duration))
+
+            connection.commit()
+
+            print("\nStudy plan added.")
+
+        elif choice == "2":
+
+            cursor.execute("""
+                SELECT subject, study_date, duration
+                FROM study_plan
+                ORDER BY study_date
+            """)
+
+            plans = cursor.fetchall()
+
+            if not plans:
+                print("\nNo study plans found.")
+
+            for subject, study_date, duration in plans:
+                print(
+                    f"\nSubject: {subject}"
+                    f"\nDate: {study_date}"
+                    f"\nDuration: {duration} minutes"
+                )
+
+        elif choice == "3":
+            connection.close()
+            break
+
+        else:
+            print("Invalid choice.")
+
+        connection.close()
+
+
+# ---------------- PERFORMANCE ----------------
+
+def performance_menu():
+
+    while True:
+
+        print("\n--- Academic Performance ---")
+        print("1. Add Marks")
+        print("2. View Performance")
+        print("3. Back")
+
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+
+            subject = input("Subject: ")
+
+            try:
+                marks = float(input("Marks: "))
+
+                if marks < 0 or marks > 100:
+                    print("Marks must be between 0 and 100.")
+                    continue
+
+            except ValueError:
+                print("Enter a valid number.")
+                continue
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            cursor.execute("""
+                INSERT INTO performance
+                (subject, marks)
+                VALUES (?, ?)
+            """, (subject, marks))
+
+            connection.commit()
+            connection.close()
+
+            print("\nMarks added successfully.")
+
+        elif choice == "2":
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            cursor.execute("""
+                SELECT subject, marks
+                FROM performance
+            """)
+
+            records = cursor.fetchall()
+
+            if not records:
+                print("\nNo performance records found.")
+            else:
+
+                total = 0
+
+                for subject, marks in records:
+                    print(f"{subject}: {marks}")
+                    total += marks
+
+                average = total / len(records)
+
+                print(f"\nAverage Marks: {average:.2f}")
+
+            connection.close()
+
+        elif choice == "3":
+            break
+
+        else:
+            print("Invalid choice.")
+
+
+# ---------------- REPORTS ----------------
+
+def report_menu():
+
+    while True:
+
+        print("\n--- Dashboard & Reports ---")
+        print("1. Summary")
+        print("2. Back")
+
+        choice = input("Enter your choice: ").strip()
+
+        if choice == "1":
+
+            connection = sqlite3.connect(DATABASE_NAME)
+            cursor = connection.cursor()
+
+            cursor.execute("SELECT COUNT(*) FROM assignments")
+            assignments = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(*) FROM assignments
+                WHERE status = 'Completed'
+            """)
+            completed = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM attendance")
+            attendance = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM study_plan")
+            study_plans = cursor.fetchone()[0]
+
+            cursor.execute("SELECT COUNT(*) FROM performance")
+            performance = cursor.fetchone()[0]
+
+            print("\n" + "=" * 45)
+            print("             CAMPUSMATE DASHBOARD")
+            print("=" * 45)
+
+            print("Total Assignments :", assignments)
+            print("Completed         :", completed)
+            print("Attendance Records:", attendance)
+            print("Study Plans       :", study_plans)
+            print("Performance Records:", performance)
+
+            print("=" * 45)
+
+            connection.close()
+
+        elif choice == "2":
+            break
+
+        else:
+            print("Invalid choice.")
+
+
+# ---------------- MAIN MENU ----------------
+
+def main_menu():
+
+    while True:
+
+        display_banner()
+
+        print("\n1. Student Profile")
+        print("2. Assignment Manager")
+        print("3. Attendance Manager")
+        print("4. Study Planner")
+        print("5. Academic Performance")
+        print("6. Dashboard & Reports")
+        print("7. Exit")
+
+        choice = input("\nEnter your choice: ").strip()
+
+        if choice == "1":
+            student_menu()
+
+        elif choice == "2":
+            assignments_menu()
+
+        elif choice == "3":
+            attendance_menu()
+
+        elif choice == "4":
+            study_menu()
+
+        elif choice == "5":
+            performance_menu()
+
+        elif choice == "6":
+            report_menu()
+
+        elif choice == "7":
+            print("\nThank you for using CampusMate.")
+            print("Goodbye!")
+            break
+
+        else:
+            print("\nInvalid choice. Please select 1-7.")
+
+
+# ---------------- PROGRAM START ----------------
+
+def main():
+
+    initialize_database()
+    main_menu()
+
+
+if __name__ == "__main__":
+    main()
